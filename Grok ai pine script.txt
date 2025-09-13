@@ -1,0 +1,37 @@
+//@version=5
+strategy("Grok-Inspired MA Crossover with RSI", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Inputs for customization
+shortMALength = input.int(50, title="Short MA Length", minval=1)
+longMALength = input.int(200, title="Long MA Length", minval=1)
+rsiLength = input.int(14, title="RSI Length", minval=1)
+rsiOverbought = input.int(70, title="RSI Overbought Level")
+rsiOversold = input.int(30, title="RSI Oversold Level")
+stopLossPct = input.float(2.0, title="Stop Loss %", minval=0.1, step=0.1)
+takeProfitPct = input.float(5.0, title="Take Profit %", minval=0.1, step=0.1)
+
+// Calculate indicators
+shortMA = ta.sma(close, shortMALength)
+longMA = ta.sma(close, longMALength)
+rsi = ta.rsi(close, rsiLength)
+
+// Plot MAs for visualization
+plot(shortMA, color=color.blue, title="Short MA")
+plot(longMA, color=color.red, title="Long MA")
+
+// Buy/Sell conditions (mimicking my analysis: trend + momentum)
+buyCondition = ta.crossover(shortMA, longMA) and rsi < rsiOverbought
+sellCondition = ta.crossunder(shortMA, longMA) and rsi > rsiOversold
+
+// Execute trades
+if (buyCondition)
+    strategy.entry("Buy", strategy.long)
+    strategy.exit("Exit Buy", "Buy", stop=close * (1 - stopLossPct/100), limit=close * (1 + takeProfitPct/100))
+
+if (sellCondition)
+    strategy.entry("Sell", strategy.short)
+    strategy.exit("Exit Sell", "Sell", stop=close * (1 + stopLossPct/100), limit=close * (1 - takeProfitPct/100))
+
+// Alerts for live trading (if you connect to a broker)
+alertcondition(buyCondition, title="Grok Buy Signal", message="Potential Buy: MA Crossover with RSI Filter")
+alertcondition(sellCondition, title="Grok Sell Signal", message="Potential Sell: MA Crossunder with RSI Filter")
