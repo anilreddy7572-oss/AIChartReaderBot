@@ -1,0 +1,90 @@
+// 🔥 PHASE 2: Clean Multi-Market Bias Bot (Trend Zones + Trade Signals + TP/SL)
+// Works on: BTCUSD, ETHUSD, SOLUSD, NIFTY, FOREX (Any market)
+// Timeframe: 15m (default), can be used on any
+
+//@version=5
+indicator("Anil's Multi-Market Bias Bot", overlay=true)
+
+// === INPUTS ===
+ema1Len = input.int(9, title="EMA Fast")
+ema2Len = input.int(21, title="EMA Mid")
+ema3Len = input.int(50, title="EMA Long")
+atrLen  = input.int(14, title="ATR Length")
+atrMult = input.float(2.0, title="ATR Multiplier")
+
+// === CALCULATIONS ===
+ema1 = ta.ema(close, ema1Len)
+ema2 = ta.ema(close, ema2Len)
+ema3 = ta.ema(close, ema3Len)
+atr  = ta.atr(atrLen)
+
+// === TREND DETECTION ===
+upTrend   = ema1 > ema2 and ema2 > ema3
+downTrend = ema1 < ema2 and ema2 < ema3
+
+// === BACKGROUND COLOR ===
+bgcolor(upTrend ? color.new(color.green, 90) : na)
+bgcolor(downTrend ? color.new(color.red, 90) : na)
+
+// === SWING HIGH/LOW FOR TP/SL ===
+swingHigh = ta.highest(high, 20)
+swingLow  = ta.lowest(low, 20)
+
+longTP = close + (close - swingLow) * 2
+longSL = swingLow
+
+shortTP = close - (swingHigh - close) * 2
+shortSL = swingHigh
+
+// === ENTRY SIGNALS ===
+buySignalRaw  = upTrend and close > ema1 and close > ema2 and volume > ta.sma(volume, 14)
+sellSignalRaw = downTrend and close < ema1 and close < ema2 and volume > ta.sma(volume, 14)
+
+// === TRADE STATE TRACKING ===
+var bool inTrade = false
+var float entryPrice = na
+var bool tradeDirLong = na
+
+buySignal = false
+sellSignal = false
+
+if not inTrade and buySignalRaw
+    buySignal := true
+    inTrade := true
+    entryPrice := close
+    tradeDirLong := true
+
+if not inTrade and sellSignalRaw
+    sellSignal := true
+    inTrade := true
+    entryPrice := close
+    tradeDirLong := false
+
+// === EXIT CONDITIONS ===
+exitLong  = tradeDirLong and (low <= longSL or high >= longTP)
+exitShort = not tradeDirLong and (high >= shortSL or low <= shortTP)
+
+if exitLong or exitShort
+    inTrade := false
+    entryPrice := na
+    tradeDirLong := na
+
+// === PLOT SIGNALS ===
+plotshape(buySignal, title="Buy Signal", location=location.belowbar, style=shape.triangleup, color=color.lime, size=size.small)
+plotshape(sellSignal, title="Sell Signal", location=location.abovebar, style=shape.triangledown, color=color.red, size=size.small)
+
+// === TP/SL Zones ===
+plotshape(buySignal ? longTP : na, title="Long TP", location=location.absolute, style=shape.labelup, color=color.green, text="TP")
+plotshape(buySignal ? longSL : na, title="Long SL", location=location.absolute, style=shape.labeldown, color=color.red, text="SL")
+
+plotshape(sellSignal ? shortTP : na, title="Short TP", location=location.absolute, style=shape.labeldown, color=color.green, text="TP")
+plotshape(sellSignal ? shortSL : na, title="Short SL", location=location.absolute, style=shape.labelup, color=color.red, text="SL")
+
+// === MOVING AVERAGES ===
+plot(ema1, title="EMA 9", color=color.orange)
+plot(ema2, title="EMA 21", color=color.blue)
+plot(ema3, title="EMA 50", color=color.purple)
+
+// === ALERT CONDITIONS ===
+alertcondition(buySignal, title="Buy Alert", message="Buy Signal on {{ticker}}")
+alertcondition(sellSignal, title="Sell Alert", message="Sell Signal on {{ticker}}")
